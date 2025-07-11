@@ -22,6 +22,7 @@ app.listen(port, () => {
   const [output, setOutput] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isInstalled, setIsInstalled] = useState(false);
+  const [showConsole, setShowConsole] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const serverProcessRef = useRef<{ kill: () => void } | null>(null);
 
@@ -30,7 +31,7 @@ app.listen(port, () => {
     
     const initWebContainer = async () => {
       try {
-        setOutput('WebContainerを初期化中...\n');
+        // バックグラウンドで初期化
         const instance = await getWebContainerInstance();
         
         if (isSubscribed) {
@@ -64,19 +65,13 @@ app.listen(port, () => {
           
           await instance.mount(files);
           
-          // 依存関係をインストール
-          setOutput(prev => prev + '依存関係をインストール中...\n');
-          const installProcess = await instance.spawn('npm', ['install']);
-          installProcess.output.pipeTo(new WritableStream({
-            write(data) {
-              setOutput(prev => prev + data);
-            }
-          }));
+          // 依存関係をサイレントモードでインストール
+          const installProcess = await instance.spawn('npm', ['install', '--silent']);
+          await installProcess.exit;
           
           await installProcess.exit;
           
           if (isSubscribed) {
-            setOutput(prev => prev + '\n✅ 準備完了！実行ボタンを押してください。\n');
             setIsInstalled(true);
             setIsLoading(false);
           }
@@ -114,7 +109,8 @@ app.listen(port, () => {
         serverProcessRef.current = null;
       }
       
-      setOutput(prev => prev + '\n--- 再実行中 ---\n');
+      setShowConsole(true);
+      setOutput('--- 実行中 ---\n');
       
       // コードを更新
       await webcontainerInstance.fs.writeFile('/index.ts', code);
@@ -134,6 +130,17 @@ app.listen(port, () => {
       setOutput(prev => prev + '\nエラー: ' + error);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-100">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
+          <p className="text-lg text-gray-600">環境を準備しています...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen bg-gray-100">
@@ -169,12 +176,14 @@ app.listen(port, () => {
             </div>
           </div>
           
-          <div className="bg-white rounded-lg shadow p-4 h-48">
-            <h2 className="text-lg font-semibold mb-2">コンソール出力</h2>
-            <pre className="bg-gray-900 text-green-400 p-2 rounded h-32 overflow-auto text-sm">
-              {output}
-            </pre>
-          </div>
+          {showConsole && (
+            <div className="bg-white rounded-lg shadow p-4 h-48">
+              <h2 className="text-lg font-semibold mb-2">コンソール出力</h2>
+              <pre className="bg-gray-900 text-green-400 p-2 rounded h-32 overflow-auto text-sm">
+                {output}
+              </pre>
+            </div>
+          )}
         </div>
         
         <div className="w-1/2 bg-white rounded-lg shadow p-4">
