@@ -23,7 +23,7 @@ app.listen(port, () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isInstalled, setIsInstalled] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const serverProcessRef = useRef<any>(null);
+  const serverProcessRef = useRef<{ kill: () => void } | null>(null);
 
   useEffect(() => {
     let isSubscribed = true;
@@ -88,7 +88,7 @@ app.listen(port, () => {
             }
           });
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error('WebContainer initialization failed:', error);
         if (isSubscribed) {
           setOutput('エラー: WebContainerの初期化に失敗しました。\n' + error);
@@ -102,7 +102,7 @@ app.listen(port, () => {
     return () => {
       isSubscribed = false;
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const runCode = async () => {
     if (!webcontainerInstance || !isInstalled) return;
